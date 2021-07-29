@@ -29,14 +29,14 @@ class Clipboard extends ClipboardOperator {
   }
 
   @override
-  void setContents(String contents) {
-    _clip.setContents(contents);
+  Future<void> setContents(String contents) {
+    return _clip.setContents(contents);
   }
 }
 
 abstract class ClipboardOperator {
   String getContents();
-  void setContents(String contents);
+  Future<void> setContents(String contents);
 }
 
 class _WinClipboard extends ClipboardOperator {
@@ -57,7 +57,7 @@ class _WinClipboard extends ClipboardOperator {
   }
 
   @override
-  void setContents(String contents) {
+  Future<void> setContents(String contents) async {
     var hMem = contents.toNativeUtf8().address;
 
     OpenClipboard(NULL);
@@ -75,7 +75,7 @@ class _MacClipboard extends ClipboardOperator {
   }
 
   @override
-  void setContents(String contents) {
+  Future<void> setContents(String contents) async {
     // TODO: implement setContents
   }
 }
@@ -83,12 +83,26 @@ class _MacClipboard extends ClipboardOperator {
 class _LinuxClipboard extends ClipboardOperator {
   @override
   String getContents() {
-    // TODO: implement getContents
-    throw UnimplementedError();
+    var result =
+        Process.runSync('/usr/bin/xclip', ['-o', '-selection', 'clipboard']);
+
+    if (result.exitCode != 0) {
+      throw ProcessException(
+          '/usr/bin/xclip',
+          ['-o', '-selection', 'clipboard'],
+          result.stderr.toString(),
+          result.exitCode);
+    }
+
+    return result.stdout.toString();
   }
 
   @override
-  void setContents(String contents) {
-    // TODO: implement setContents
+  Future<void> setContents(String contents) async {
+    return await Process.start('/usr/bin/xclip', ['-selection', 'clipboard'])
+        .then((process) {
+      process.stdin.write(contents);
+      process.stdin.close();
+    });
   }
 }
